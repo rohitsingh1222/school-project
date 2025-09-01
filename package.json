@@ -1,0 +1,11 @@
+{
+  "name": "assignment",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "concurrently \"npm run start --prefix school-project\" \"npm run start --prefix server\""
+  },
+  "dependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
+
