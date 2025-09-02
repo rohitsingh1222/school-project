@@ -1,89 +1,84 @@
 import express from "express";
-import serverless from "serverless-http";
-import mysql from "mysql2/promise";
 import cors from "cors";
-import dotenv from "dotenv";
 import multer from "multer";
-import { v2 as cloudinary } from "cloudinary";
+import dotenv from "dotenv";
+import mysql from "mysql2/promise";
+import serverless from "serverless-http";
 
 dotenv.config();
+
 const app = express();
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-// ---- Cloudinary config ----
-cloudinary.config({
-  cloud_name: process.env.CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-// ---- Multer setup (store in memory) ----
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
-
-// ---- MySQL connection pool (PlanetScale) ----
+// Database connection (PlanetScale)
 const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT || 3306,
+  host: process.env.DATABASE_HOST,     // e.g. aws.connect.psdb.cloud
+  user: process.env.DATABASE_USERNAME, // from PlanetScale
+  password: process.env.DATABASE_PASSWORD,
+  database: process.env.DATABASE_NAME,
   ssl: { rejectUnauthorized: true },
 });
 
-// ---- POST: add school with image upload ----
+// File upload (using memory storage for serverless)
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+
+// Test route
+app.get("/api", (req, res) => {
+  res.send("✅ Backend is running!");
+});
+
+// Add school
 app.post("/api/schools", upload.single("image"), async (req, res) => {
   try {
     const { name, address, city, state, contact, email_id } = req.body;
+
     if (!name || !address || !city || !state || !contact || !email_id) {
-      return res.status(400).json({ error: "Missing required fields" });
+      return res.status(400).json({ error: "All fields are required" });
     }
 
-    let imageUrl = null;
-    if (req.file) {
-      imageUrl = await new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          { folder: "schools" },
-          (error, result) => {
-            if (error) return reject(error);
-            resolve(result.secure_url);
-          }
-        );
-        stream.end(req.file.buffer);
-      });
-    }
+    // Save image buffer as base64 (you can later connect Cloudinary if needed)
+    const image = req.file ? req.file.buffer.toString("base64") : null;
 
-    const sql =
-      "INSERT INTO schools (name,address,city,state,contact,image,email_id) VALUES (?,?,?,?,?,?,?)";
-    const [result] = await pool.query(sql, [
-      name,
-      address,
-      city,
-      state,
-      contact,
-      imageUrl,
-      email_id,
-    ]);
+    const query = `
+      INSERT INTO schools (name, address, city, state, contact, email_id, image)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `;
+    const values = [name, address, city, state, contact, email_id, image];
 
-    res.json({ ok: true, id: result.insertId, image: imageUrl });
-  } catch (e) {
-    console.error("Insert error:", e);
-    res.status(500).json({ error: e.message });
+    const conn = await pool.getConnection();
+    await conn.query(query, values);
+    conn.release();
+
+    res.status(201).json({ message: "School added successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-// ---- GET: fetch schools ----
+// Get schools
 app.get("/api/schools", async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      "SELECT id, name, address, city, image FROM schools ORDER BY id DESC"
-    );
+    const conn = await pool.getConnection();
+    const [rows] = await conn.query("SELECT * FROM schools");
+    conn.release();
+
     res.json(rows);
   } catch (err) {
-    console.error("Select error:", err);
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-export default serverless(app);
+// Local development (runs only when not in Vercel)
+if (process.env.NODE_ENV !== "production") {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+}
+
+// Export for Vercel
+export const handler = serverless(app);

@@ -1,14 +1,9 @@
 import React from "react";
 import { useForm } from "react-hook-form";
-import axios from "axios";
+import API from "../api"; // 👈 axios instance
 
 export default function AddSchool() {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-  } = useForm();
+  const { register, handleSubmit, formState: { errors }, reset } = useForm();
 
   const onSubmit = async (data) => {
     try {
@@ -21,11 +16,13 @@ export default function AddSchool() {
       formData.append("email_id", data.email_id);
       formData.append("image", data.image[0]);
 
-      // ✅ Use relative API path for Vercel deployment
-      await axios.post("/api/schools", formData);
+      await API.post("/schools", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
-      alert("School added successfully");
+      alert("✅ School added successfully");
       reset();
+      document.querySelector("input[type='file']").value = "";
     } catch (err) {
       console.error(err);
       alert(err?.response?.data?.error || err.message);
@@ -33,67 +30,83 @@ export default function AddSchool() {
   };
 
   return (
-    <div style={{ maxWidth: 600, margin: "20px auto" }}>
-      <h2>Add School</h2>
-      <form onSubmit={handleSubmit(onSubmit)}>
+    <div className="flex justify-center items-center min-h-screen bg-gray-100 p-4">
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="bg-white p-6 rounded-lg shadow-md w-full max-w-md space-y-4"
+      >
+        <h2 className="text-xl font-bold text-center">Add School</h2>
+
         <input
           {...register("name", { required: "Name is required" })}
           placeholder="Name"
+          className="border p-2 w-full rounded"
         />
-        {errors.name && <div style={{ color: "red" }}>{errors.name.message}</div>}
+        {errors.name && <p className="text-red-500">{errors.name.message}</p>}
 
         <input
           {...register("address", { required: "Address is required" })}
           placeholder="Address"
+          className="border p-2 w-full rounded"
         />
-        {errors.address && <div style={{ color: "red" }}>{errors.address.message}</div>}
+        {errors.address && <p className="text-red-500">{errors.address.message}</p>}
 
         <input
           {...register("city", { required: "City is required" })}
           placeholder="City"
+          className="border p-2 w-full rounded"
         />
-        {errors.city && <div style={{ color: "red" }}>{errors.city.message}</div>}
+        {errors.city && <p className="text-red-500">{errors.city.message}</p>}
 
         <input
           {...register("state", { required: "State is required" })}
           placeholder="State"
+          className="border p-2 w-full rounded"
         />
-        {errors.state && <div style={{ color: "red" }}>{errors.state.message}</div>}
+        {errors.state && <p className="text-red-500">{errors.state.message}</p>}
 
         <input
           type="tel"
           {...register("contact", {
             required: "Contact number is required",
             pattern: {
-              value: /^[0-9]{10,15}$/,
-              message: "Contact must be 10–15 digits only",
+              value: /^[0-9]{10}$/, // 10 digits
+              message: "Contact must be exactly 10 digits",
             },
           })}
           placeholder="Contact"
+          className="border p-2 w-full rounded"
         />
-        {errors.contact && <div style={{ color: "red" }}>{errors.contact.message}</div>}
+        {errors.contact && <p className="text-red-500">{errors.contact.message}</p>}
 
         <input
           type="email"
           {...register("email_id", {
             required: "Email is required",
             pattern: {
-              value: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.(com|org|net|edu|in)$/,
+              value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
               message: "Invalid email address",
             },
           })}
           placeholder="Email"
+          className="border p-2 w-full rounded"
         />
-        {errors.email_id && <div style={{ color: "red" }}>{errors.email_id.message}</div>}
+        {errors.email_id && <p className="text-red-500">{errors.email_id.message}</p>}
 
         <input
           type="file"
           accept="image/*"
           {...register("image", { required: "Image is required" })}
+          className="border p-2 w-full rounded"
         />
-        {errors.image && <div style={{ color: "red" }}>{errors.image.message}</div>}
+        {errors.image && <p className="text-red-500">{errors.image.message}</p>}
 
-        <button type="submit">Add School</button>
+        <button
+          type="submit"
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+        >
+          Add School
+        </button>
       </form>
     </div>
   );
